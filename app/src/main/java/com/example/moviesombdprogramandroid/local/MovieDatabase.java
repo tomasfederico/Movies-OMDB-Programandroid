@@ -6,4 +6,7 @@ import androidx.room.RoomDatabase;
 @Database(version = 1, entities = {MovieEntity.class})
 public abstract class MovieDatabase extends RoomDatabase {
 
+    // instanciar DAO
+    abstract MovieLocalDAO getMovieLocalDao();
+
 }
