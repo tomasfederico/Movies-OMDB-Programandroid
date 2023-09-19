@@ -3,6 +3,8 @@ package com.example.moviesombdprogramandroid;
 import com.google.gson.annotations.SerializedName;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public class Movie implements Serializable {
@@ -19,7 +21,7 @@ public class Movie implements Serializable {
     @SerializedName("imdbID")
     private String id;
 
-    public Movie(String title, String image, String year, String id) {
+    public Movie(String id, String title, String image, String year) {
         this.title = title;
         this.image = image;
         this.year = year;
@@ -53,4 +55,5 @@ public class Movie implements Serializable {
     public int hashCode() {
         return Objects.hash(id);
     }
+
 }

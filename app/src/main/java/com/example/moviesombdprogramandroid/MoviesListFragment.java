@@ -18,9 +18,13 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.moviesombdprogramandroid.local.DatabaseHandler;
+import com.example.moviesombdprogramandroid.local.MovieEntity;
+import com.example.moviesombdprogramandroid.local.MovieLocalDAO;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import retrofit2.Call;
@@ -28,7 +32,6 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 public class MoviesListFragment extends Fragment {
-
     // DECLARACION DE ATRIBUTOS DEL FRAGMENT
     private RecyclerView playersRecyclerview;
     private MovieAdapter movieAdapter;
@@ -39,8 +42,11 @@ public class MoviesListFragment extends Fragment {
     private FloatingActionButton removeListFloatingButton;
 
     // CREACION DEL MOVIES DAO QUIEN MANEJARA EL ACCESO A LA INFORMACION DE LA API.
-    // esto deberia estar en la parte del viewmodel.
+    // esto deberia estar en la parte del repository del viewmodel.
     private MoviesDAO moviesDAO;
+    // handler de DB. esto tambien deberia estar en el repository del mvvm
+    private DatabaseHandler databaseHandler;
+    private MovieLocalDAO movieLocalDAO;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -64,6 +70,9 @@ public class MoviesListFragment extends Fragment {
 
         // instanciar objeto DAO para comunicarse con api.
         moviesDAO = new MoviesDAO();
+        // instanciar handler y objeto DAO para comunicarse con DB
+        databaseHandler = new DatabaseHandler(getActivity().getApplicationContext());
+        movieLocalDAO = databaseHandler.getMovieLocalDao();
     }
 
     @Override
@@ -124,12 +133,19 @@ public class MoviesListFragment extends Fragment {
         moviesDAO.getMoviesEndpoints().getMoviesByName("78e7f4b6", movieTitle).enqueue(new Callback<MoviesResponse>() {
             @Override
             public void onResponse(Call<MoviesResponse> call, Response<MoviesResponse> response) {
-                if (response.isSuccessful() && response != null){
+                if (response.isSuccessful() && response != null) {
                     MoviesResponse moviesResponse = response.body();
                     List<Movie> movies = moviesResponse.getMovies(); // devuelve listado de peliculas de la api, almaceno en una variable
                     movieAdapter.setMoviesList(movies);
-                    Toast.makeText(getContext(),"comunicacion OK",Toast.LENGTH_SHORT).show();
-                }else{
+                    List<MovieEntity> movieEntities = new ArrayList<>();
+                    movieEntities = transformMoviesToEntities(movies);
+                    try {
+                        movieLocalDAO.insertAllMovies(movieEntities);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    Toast.makeText(getContext(), "comunicacion OK", Toast.LENGTH_SHORT).show();
+                } else {
                     try {
                         Toast.makeText(getContext(), response.errorBody().string(), Toast.LENGTH_LONG).show();
                     } catch (IOException e) {
@@ -137,11 +153,43 @@ public class MoviesListFragment extends Fragment {
                     }
                 }
             }
+
             @Override
             public void onFailure(Call<MoviesResponse> call, Throwable t) {
-                Toast.makeText(getContext(),"comunicacion fallo",Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "comunicacion fallo", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private List<MovieEntity> getMovieEntitiesFromDataBase(){
+        List<MovieEntity> movieEntities = databaseHandler.getMovieLocalDao().getNinetiesMovies();
+        return movieEntities;
+    }
+
+    private List <MovieEntity> transformMoviesToEntities(List<Movie> movies){
+        List<MovieEntity> movieEntities = new ArrayList<>();
+        for (Movie movie : movies) {
+            String id = movie.getId();
+            String title = movie.getTitle();
+            String image = movie.getImage();
+            String year = movie.getYear();
+            MovieEntity movieEntity = new MovieEntity(id, title, image, year);
+            movieEntities.add(movieEntity);
+        }
+        return movieEntities;
+    }
+
+    private List <Movie> transformEntitiesToMovies(List<MovieEntity> movieEntities){
+        List<Movie> movies = new ArrayList<>();
+        for (MovieEntity movieEntity : movieEntities) {
+            String id = movieEntity.getId();
+            String title = movieEntity.getTitle();
+            String image = movieEntity.getImage();
+            String year = movieEntity.getYear();
+            Movie movie = new Movie(id, title, image, year);
+            movies.add(movie);
+        }
+        return movies;
     }
 
     // manejar la logica del empty state
@@ -172,7 +220,9 @@ public class MoviesListFragment extends Fragment {
             @Override
             public void onClick(View v) {
                 // Anulo la lista del adapter, que es la que se esta mostrando en pantalla
-                movieAdapter.setMoviesList(null);
+                List<MovieEntity> movieEntities = getMovieEntitiesFromDataBase();
+                List<Movie> movies = transformEntitiesToMovies(movieEntities);
+                movieAdapter.setMoviesList(movies);
 
             }
         });
